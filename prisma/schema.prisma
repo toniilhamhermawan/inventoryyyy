@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+model User {
+  id           String  @id @default(uuid()) @db.Uuid
+  supabaseId   String? @unique @db.Uuid
+  email        String  @unique
+  name         String?
+  passwordHash String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  business       Business?
+  stockIns       StockIn[]       @relation("StockInCreatedBy")
+  stockOuts      StockOut[]      @relation("StockOutCreatedBy")
+  stockMovements StockMovement[] @relation("StockMovementCreatedBy")
+}
+
+model Business {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+
+  ownerId String @unique @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  categories     Category[]
+  products       Product[]
+  stockIns       StockIn[]
+  stockOuts      StockOut[]
+  stockMovements StockMovement[]
+}
+
+model Category {
+  id          String  @id @default(uuid()) @db.Uuid
+  businessId  String  @db.Uuid
+  name        String
+  description String?
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  products Product[]
+
+  @@unique([businessId, name])
+}
+
+model Product {
+  id         String  @id @default(uuid()) @db.Uuid
+  businessId String  @db.Uuid
+  categoryId String? @db.Uuid
+
+  sku           String
+  name          String
+  purchasePrice Decimal @db.Decimal(14, 2)
+  sellingPrice  Decimal @db.Decimal(14, 2)
+  stock         Int     @default(0)
+  minStock      Int     @default(0)
+  unit          String
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  stockIns       StockIn[]
+  stockOuts      StockOut[]
+  stockMovements StockMovement[]
+
+  @@unique([businessId, sku])
+  @@index([businessId, name])
+  @@index([categoryId])
+}
+
+model StockIn {
+  id          String  @id @default(uuid()) @db.Uuid
+  businessId  String  @db.Uuid
+  productId   String  @db.Uuid
+  createdById String? @db.Uuid
+
+  quantity        Int
+  purchasePrice   Decimal @db.Decimal(14, 2)
+  referenceNumber String?
+  note            String?
+  stockBefore     Int
+  stockAfter      Int
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  createdBy User?    @relation("StockInCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  movement StockMovement? @relation("StockInMovement")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([businessId, createdAt])
+  @@index([productId, createdAt])
+  @@index([createdById])
+}
+
+model StockOut {
+  id          String  @id @default(uuid()) @db.Uuid
+  businessId  String  @db.Uuid
+  productId   String  @db.Uuid
+  createdById String? @db.Uuid
+
+  quantity        Int
+  sellingPrice    Decimal? @db.Decimal(14, 2)
+  referenceNumber String?
+  note            String?
+  stockBefore     Int
+  stockAfter      Int
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  createdBy User?    @relation("StockOutCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  movement StockMovement? @relation("StockOutMovement")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([businessId, createdAt])
+  @@index([productId, createdAt])
+  @@index([createdById])
+}
+
+model StockMovement {
+  id          String  @id @default(uuid()) @db.Uuid
+  businessId  String  @db.Uuid
+  productId   String  @db.Uuid
+  createdById String? @db.Uuid
+
+  type        MovementType
+  quantity    Int
+  stockBefore Int
+  stockAfter  Int
+  note        String?
+
+  stockInId  String? @unique @db.Uuid
+  stockOutId String? @unique @db.Uuid
+
+  business  Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: Cascade)
+  createdBy User?    @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  stockIn  StockIn?  @relation("StockInMovement", fields: [stockInId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  stockOut StockOut? @relation("StockOutMovement", fields: [stockOutId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([businessId, createdAt])
+  @@index([productId, createdAt])
+  @@index([createdById])
+}
