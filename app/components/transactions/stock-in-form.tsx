@@ -38,17 +38,25 @@ export function StockInForm({ products }: { products: ProductOption[] }) {
   const [clientError, setClientError] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ product: string; qty: string; date: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const allowSubmitRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
     if (!state.ok) return;
     const timeoutId = window.setTimeout(() => {
       setConfirmOpen(false);
+      allowSubmitRef.current = false;
       formRef.current?.reset();
       router.refresh();
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [state.ok, router]);
+
+  useEffect(() => {
+    if (state.error) {
+      allowSubmitRef.current = false;
+    }
+  }, [state.error]);
 
   const productsById = useMemo(
     () => new Map(products.map((p) => [p.id, p])),
@@ -56,6 +64,18 @@ export function StockInForm({ products }: { products: ProductOption[] }) {
   );
 
   function handleRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (allowSubmitRef.current) {
+      allowSubmitRef.current = false;
+      setConfirmOpen(false);
+      return;
+    }
+
+    if (confirmOpen) {
+      allowSubmitRef.current = true;
+      setConfirmOpen(false);
+      return;
+    }
+
     event.preventDefault();
     setClientError(null);
     const form = event.currentTarget;
